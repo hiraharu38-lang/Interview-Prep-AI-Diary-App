@@ -3,8 +3,8 @@ from google import genai
 import time
 
 st.set_page_config(
-    page_title="一問一答！面接採点AI",
-    page_icon="🎯",
+    page_title="今日の面接",
+    page_icon="📅",
     layout="centered"
 )
 
@@ -40,8 +40,9 @@ def generate_with_retry(prompt):
             else:
                 raise e
 
-st.title("🎯 一問一答！面接採点AI")
-st.caption("あなたの回答をその場でガチ採点＆即修正する特化型ツール")
+# アプリ名を「今日の面接」に変更！
+st.title("📅 今日の面接")
+st.caption("日常から面接の雰囲気に慣れ、言葉遣いと語彙力をワンタップで鍛える一問一答AI")
 
 # --- ステップ1: 日記（テーマ）の入力 ---
 if st.session_state.step == "input_diary":
@@ -56,7 +57,6 @@ if st.session_state.step == "input_diary":
                     "この内容をガクチカとして深掘りするための、鋭い質問を1つだけ作成してください。\n"
                     "前置きや挨拶は一切抜きで、質問のセリフだけを出力してください。"
                 )
-                # 🛠 外側の不要な try-except を完全排除！関数が限界まで粘り切る仕様
                 question = generate_with_retry(prompt)
                 st.session_state.diary_theme = user_initial
                 st.session_state.ai_question = question
@@ -87,13 +87,12 @@ elif st.session_state.step == "answer_question":
                     "スマホで見やすくなるよう、長文は避け、必ず以下のフォーマット（絵文字含む）通りに出力してください。\n\n"
                     "💯 【得点】: 〇〇点 / 100点\n\n"
                     "👍 【良かったところ】\n"
-                    "・（ここに箇条書きで1点）\n\n"
+                    "・（ここに箇条書きで1点。言葉遣いや語彙についてのフィードバックも含める）\n\n"
                     "⚠️ 【悪かったところ・足りない視点】\n"
-                    "・（ここに箇条書きで1点）\n\n"
+                    "・（ここに箇条書きで1点。面接の雰囲気として足りない表現などを指摘）\n\n"
                     "✨ 【こう直すともっと響く！修正案】\n"
-                    "「（ここに面接官を唸らせる具体的な模範解答の文章）」"
+                    "「（ここに語彙力や適切な敬語を取り入れた、面接官を唸らせる具体的な模範解答の文章）」"
                 )
-                # 🛠 採点部分も外側の try-except を排除！
                 result_text = generate_with_retry(score_prompt)
                 st.session_state.user_answer = ans
                 st.session_state.score_result = result_text
@@ -121,6 +120,4 @@ elif st.session_state.step == "show_result":
         st.session_state.step = "input_diary"
         st.session_state.diary_theme = ""
         st.session_state.ai_question = ""
-        st.session_state.user_answer = ""
-        st.session_state.score_result = ""
-        st.rerun()
+        st.session_state.user_answer
