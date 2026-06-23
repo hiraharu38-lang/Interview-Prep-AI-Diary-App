@@ -26,7 +26,7 @@ if "user_answer" not in st.session_state:
 if "score_result" not in st.session_state:
     st.session_state.score_result = ""
 
-# 🔥 元の「10回全滅するまでは絶対に大元にエラーを漏らさない」関数（2秒間隔版）
+# 🔥 10回全滅するまでは絶対に大元にエラーを漏らさない鉄壁の関数（2秒間隔）
 def generate_with_retry(prompt):
     max_retries = 10  
     for i in range(max_retries):
@@ -50,21 +50,18 @@ if st.session_state.step == "input_diary":
 
     if st.button("質問を生成する", type="primary"):
         if user_initial.strip() != "":
-            with st.spinner("面接官が深掘り質問を考えています..."):
+            with st.spinner("面接官が深掘り質問を考えています...（最大20秒粘ります）"):
                 prompt = (
                     f"あなたは採用面接官です。学生から「{user_initial}」という取り組みを聞きました。\n"
                     "この内容をガクチカとして深掘りするための、鋭い質問を1つだけ作成してください。\n"
                     "前置きや挨拶は一切抜きで、質問のセリフだけを出力してください。"
                 )
-                try:
-                    # エラー検知での途中の割り込みを無くし、関数側に完全に任せる
-                    question = generate_with_retry(prompt)
-                    st.session_state.diary_theme = user_initial
-                    st.session_state.ai_question = question
-                    st.session_state.step = "answer_question"
-                    st.rerun()
-                except:
-                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
+                # 🛠 外側の不要な try-except を完全排除！関数が限界まで粘り切る仕様
+                question = generate_with_retry(prompt)
+                st.session_state.diary_theme = user_initial
+                st.session_state.ai_question = question
+                st.session_state.step = "answer_question"
+                st.rerun()
 
 # --- ステップ2: 質問への回答 ---
 elif st.session_state.step == "answer_question":
@@ -81,7 +78,7 @@ elif st.session_state.step == "answer_question":
         
     if submit:
         if ans.strip() != "":
-            with st.spinner("採点中... 評価シートを作成しています..."):
+            with st.spinner("採点中... 評価シートを作成しています...（最大20秒粘ります）"):
                 score_prompt = (
                     f"面接のテーマ: {st.session_state.diary_theme}\n"
                     f"面接官の質問: {st.session_state.ai_question}\n"
@@ -96,15 +93,12 @@ elif st.session_state.step == "answer_question":
                     "✨ 【こう直すともっと響く！修正案】\n"
                     "「（ここに面接官を唸らせる具体的な模範解答の文章）」"
                 )
-                try:
-                    # 採点時も同様に、10回耐え切るまでエラーを画面に出さない
-                    result_text = generate_with_retry(score_prompt)
-                    st.session_state.user_answer = ans
-                    st.session_state.score_result = result_text
-                    st.session_state.step = "show_result"
-                    st.rerun()
-                except:
-                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
+                # 🛠 採点部分も外側の try-except を排除！
+                result_text = generate_with_retry(score_prompt)
+                st.session_state.user_answer = ans
+                st.session_state.score_result = result_text
+                st.session_state.step = "show_result"
+                st.rerun()
 
 # --- ステップ3: 採点結果の表示 ---
 elif st.session_state.step == "show_result":
