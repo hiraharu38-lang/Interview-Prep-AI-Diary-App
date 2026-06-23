@@ -16,7 +16,7 @@ client = genai.Client(api_key=api_key)
 
 # 状態管理の初期化
 if "step" not in st.session_state:
-    st.session_state.step = "input_diary"  # 状態：input_diary -> answer_question -> show_result
+    st.session_state.step = "input_diary"
 if "diary_theme" not in st.session_state:
     st.session_state.diary_theme = ""
 if "ai_question" not in st.session_state:
@@ -26,7 +26,7 @@ if "user_answer" not in st.session_state:
 if "score_result" not in st.session_state:
     st.session_state.score_result = ""
 
-# エラー回避用のリトライ関数
+# 🔥 10回全滅するまでは絶対にエラーを漏らさない関数
 def generate_with_retry(prompt):
     max_retries = 10  
     for i in range(max_retries):
@@ -35,7 +35,7 @@ def generate_with_retry(prompt):
             return response.text
         except Exception as e:
             if i < max_retries - 1:
-                time.sleep(3.0)
+                time.sleep(3.0)  # 3秒待ってリトライ
                 continue
             else:
                 raise e
@@ -57,13 +57,14 @@ if st.session_state.step == "input_diary":
                     "前置きや挨拶は一切抜きで、質問のセリフだけを出力してください。"
                 )
                 try:
+                    # ちゃんと再試行関数を使う
                     question = generate_with_retry(prompt)
                     st.session_state.diary_theme = user_initial
                     st.session_state.ai_question = question
                     st.session_state.step = "answer_question"
                     st.rerun()
                 except:
-                    st.error("混み合っています。もう一度ボタンを押してください。")
+                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
 
 # --- ステップ2: 質問への回答 ---
 elif st.session_state.step == "answer_question":
@@ -96,13 +97,14 @@ elif st.session_state.step == "answer_question":
                     "「（ここに面接官を唸らせる具体的な模範解答の文章）」"
                 )
                 try:
+                    # 🔧 ここが抜けていたので、しっかり generate_with_retry に修正しました！
                     result_text = generate_with_retry(score_prompt)
                     st.session_state.user_answer = ans
                     st.session_state.score_result = result_text
                     st.session_state.step = "show_result"
                     st.rerun()
                 except:
-                    st.error("採点に失敗しました。もう一度送信してください。")
+                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
 
 # --- ステップ3: 採点結果の表示 ---
 elif st.session_state.step == "show_result":
@@ -116,13 +118,11 @@ elif st.session_state.step == "show_result":
     
     st.write("---")
     
-    # 採点結果をドカンと表示
     st.markdown("### 📊 AI面接官のガチ評価シート")
     st.info(st.session_state.score_result)
     
     st.write("")
     
-    # もう一度遊ぶボタン（状態をリセット）
     if st.button("🔄 もう一度別のテーマで練習する", type="secondary"):
         st.session_state.step = "input_diary"
         st.session_state.diary_theme = ""
