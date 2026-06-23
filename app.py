@@ -44,7 +44,13 @@ if len(st.session_state.chat_history) < 2:
         if user_initial.strip() != "":
             success = False
             with st.spinner("面接官が質問を考えています..."):
-                prompt = f"あなたは企業の採用面接官です。学生から「{user_initial}」という今日の取り組みを聞きました。このエピソードをガクチカとして深掘りするための、鋭い質問を1つだけ丁寧なビジネス口調で投げかけてください。"
+                # 【プロンプト修正】余計な枕詞を完全に禁止
+                prompt = (
+                    f"あなたは企業の採用面接官です。学生から「{user_initial}」という今日の取り組みを聞きました。\n"
+                    "このエピソードをガクチカとして深掘りするための、鋭い質問を1つだけ作成してください。\n"
+                    "【重要ルール】「質問をご提案します」などの前置きや解説、挨拶は一切不要です。"
+                    "「」などの括弧も使わず、面接官がその場で学生に問いかけるセリフ（テキスト）だけを出力してください。"
+                )
                 try:
                     ai_text = generate_with_retry(prompt)
                     st.session_state.chat_history = [
@@ -77,13 +83,10 @@ if len(st.session_state.chat_history) >= 2:
     
     st.write("")
     
-    # 【超重要カイゼン】入力と送信ボタンをフォーム化し、クリアを自動化する
-    # clear_on_submit=True によって、送信された瞬間にテキストエリアが強制的に空になります
     with st.form(key="reply_form", clear_on_submit=True):
         user_reply = st.text_area("面接官の質問に対するあなたの回答を入力：", height=100)
         submit_button = st.form_submit_button(label="回答を送信する")
 
-    # アドバイス用ボタンはフォームの外側に設置
     advice_button = st.button("💡 模範解答・アドバイスを貰う")
     
     # --- 送信ボタンが押された時の処理 ---
@@ -95,7 +98,13 @@ if len(st.session_state.chat_history) >= 2:
                 chat_context += f"{speaker}: {m['text']}\n"
             chat_context += f"学生: {user_reply}\n"
             
-            prompt = f"これまでの面接のやり取りは以下の通りです：\n{chat_context}\n\nこれに対する次の深掘り質問を1つだけ、丁寧なビジネス口調で作成してください。"
+            # 【プロンプト修正】ここでも余計な解説を徹底的に排除
+            prompt = (
+                f"これまでの面接のやり取りは以下の通りです：\n{chat_context}\n\n"
+                "これに対する次の深掘り質問を1つだけ作成してください。\n"
+                "【重要ルール】「回答ありがとうございます」や「〜という意図を込めています」などの前置き・解説は一切禁止します。"
+                "面接官の純粋な質問のセリフ（テキスト）だけを1文〜2文で出力してください。"
+            )
             
             success = False
             with st.spinner("面接官が考えています..."):
@@ -117,7 +126,16 @@ if len(st.session_state.chat_history) >= 2:
             speaker = "学生" if m["role"] == "user" else "面接官"
             chat_context += f"{speaker}: {m['text']}\n"
             
-        advice_prompt = f"これまでの面接のやり取り（以下）を元に、この学生のガクチカとしての評価と、面接官を「おっ」と言わせるための『模範解答（文章例）』およびアドバイスを作成してください。\n\n【やり取り】\n{chat_context}"
+        # 【プロンプト修正】簡潔で見やすいアドバイスを要求
+        advice_prompt = (
+            f"これまでの面接のやり取りを元に、学生へのフィードバックを作成してください。\n\n"
+            f"【やり取り】\n{chat_context}\n\n"
+            "【出力ルール】\n"
+            "スマホで見やすくなるよう、長文は避け、以下の3つのセクションに分けて簡潔に箇条書きなどで出力してください。\n"
+            "1. 🎯 今回の回答の評価（良かった点・足りない視点を1文で）\n"
+            "2. 🌟 模範解答（面接官を「おっ」と言わせる文章の具体例）\n"
+            "3. 💡 ワンポイントアドバイス（次のステップへの改善点）"
+        )
         
         with st.spinner("アドバイザーが模範解答を執筆中..."):
             try:
