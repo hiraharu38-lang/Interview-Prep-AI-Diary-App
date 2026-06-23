@@ -26,7 +26,7 @@ if "user_answer" not in st.session_state:
 if "score_result" not in st.session_state:
     st.session_state.score_result = ""
 
-# 🔥 10回全滅するまでは絶対にエラーを漏らさない関数
+# 🔥 元の「10回全滅するまでは絶対に大元にエラーを漏らさない」関数（2秒間隔版）
 def generate_with_retry(prompt):
     max_retries = 10  
     for i in range(max_retries):
@@ -35,7 +35,7 @@ def generate_with_retry(prompt):
             return response.text
         except Exception as e:
             if i < max_retries - 1:
-                time.sleep(3.0)  # 3秒待ってリトライ
+                time.sleep(2.0)  # 2秒待って即リトライ
                 continue
             else:
                 raise e
@@ -57,7 +57,7 @@ if st.session_state.step == "input_diary":
                     "前置きや挨拶は一切抜きで、質問のセリフだけを出力してください。"
                 )
                 try:
-                    # ちゃんと再試行関数を使う
+                    # エラー検知での途中の割り込みを無くし、関数側に完全に任せる
                     question = generate_with_retry(prompt)
                     st.session_state.diary_theme = user_initial
                     st.session_state.ai_question = question
@@ -97,7 +97,7 @@ elif st.session_state.step == "answer_question":
                     "「（ここに面接官を唸らせる具体的な模範解答の文章）」"
                 )
                 try:
-                    # 🔧 ここが抜けていたので、しっかり generate_with_retry に修正しました！
+                    # 採点時も同様に、10回耐え切るまでエラーを画面に出さない
                     result_text = generate_with_retry(score_prompt)
                     st.session_state.user_answer = ans
                     st.session_state.score_result = result_text
