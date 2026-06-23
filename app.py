@@ -3,22 +3,30 @@ from google import genai
 import time
 
 st.set_page_config(
-    page_title="面接対策AI日記",
-    page_icon="📝",
+    page_title="一問一答！面接採点AI",
+    page_icon="🎯",
     layout="centered"
 )
 
-# 3.1 flash-lite で安定爆速化
 SELECT_MODEL = 'gemini-3.1-flash-lite'
 
 # APIの初期化
 api_key = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=api_key)
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# 状態管理の初期化
+if "step" not in st.session_state:
+    st.session_state.step = "input_diary"  # 状態：input_diary -> answer_question -> show_result
+if "diary_theme" not in st.session_state:
+    st.session_state.diary_theme = ""
+if "ai_question" not in st.session_state:
+    st.session_state.ai_question = ""
+if "user_answer" not in st.session_state:
+    st.session_state.user_answer = ""
+if "score_result" not in st.session_state:
+    st.session_state.score_result = ""
 
-# 10回全滅するまでは絶対に大元にエラーを漏らさない関数
+# エラー回避用のリトライ関数
 def generate_with_retry(prompt):
     max_retries = 10  
     for i in range(max_retries):
@@ -27,120 +35,98 @@ def generate_with_retry(prompt):
             return response.text
         except Exception as e:
             if i < max_retries - 1:
-                time.sleep(5.0)
+                time.sleep(3.0)
                 continue
             else:
                 raise e
 
-st.title("📝 面接対策AI日記")
-st.caption("日々の出来事をガクチカ・自己分析に変換する、あなた専用の面接官")
+st.title("🎯 一問一答！面接採点AI")
+st.caption("あなたの回答をその場でガチ採点＆即修正する特化型ツール")
 
-# 対話が始まっていない時だけ、最初の入力欄を表示
-if len(st.session_state.chat_history) < 2:
+# --- ステップ1: 日記（テーマ）の入力 ---
+if st.session_state.step == "input_diary":
     st.subheader("1. 今日、頑張ったことや取り組んだことは？")
-    user_initial = st.text_input("最初のエピソードを入力（1行メモでOK）", placeholder="例：スマホアプリを制作した", key="initial_input")
+    user_initial = st.text_input("エピソードを1行で入力", placeholder="例：スマホアプリの公開設定をやりきった！")
 
-    if st.button("面接スタート", type="primary"):
+    if st.button("質問を生成する", type="primary"):
         if user_initial.strip() != "":
-            success = False
-            with st.spinner("面接官が質問を考えています..."):
-                # 【プロンプト修正】余計な枕詞を完全に禁止
+            with st.spinner("面接官が深掘り質問を考えています..."):
                 prompt = (
-                    f"あなたは企業の採用面接官です。学生から「{user_initial}」という今日の取り組みを聞きました。\n"
-                    "このエピソードをガクチカとして深掘りするための、鋭い質問を1つだけ作成してください。\n"
-                    "【重要ルール】「質問をご提案します」などの前置きや解説、挨拶は一切不要です。"
-                    "「」などの括弧も使わず、面接官がその場で学生に問いかけるセリフ（テキスト）だけを出力してください。"
+                    f"あなたは採用面接官です。学生から「{user_initial}」という取り組みを聞きました。\n"
+                    "この内容をガクチカとして深掘りするための、鋭い質問を1つだけ作成してください。\n"
+                    "前置きや挨拶は一切抜きで、質問のセリフだけを出力してください。"
                 )
                 try:
-                    ai_text = generate_with_retry(prompt)
-                    st.session_state.chat_history = [
-                        {"role": "user", "text": user_initial},
-                        {"role": "model", "text": ai_text}
-                    ]
-                    success = True
+                    question = generate_with_retry(prompt)
+                    st.session_state.diary_theme = user_initial
+                    st.session_state.ai_question = question
+                    st.session_state.step = "answer_question"
+                    st.rerun()
                 except:
-                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
-            
-            if success:
-                st.rerun()
+                    st.error("混み合っています。もう一度ボタンを押してください。")
 
-# 完全にAIの回答がセットされている場合のみ対話画面を表示
-if len(st.session_state.chat_history) >= 2:
+# --- ステップ2: 質問への回答 ---
+elif st.session_state.step == "answer_question":
+    st.info(f"✨ **今日の日記テーマ:** {st.session_state.diary_theme}")
+    
+    st.subheader("🗣 面接官からの質問")
+    st.markdown(f"🤖 **「{st.session_state.ai_question}」**")
+    
     st.write("---")
     
-    # 一番上に日記エピソードを常にピン留め表示
-    initial_diary = st.session_state.chat_history[0]["text"]
-    st.info(f"✨ **今日の日記テーマ:** {initial_diary}")
+    with st.form(key="answer_form"):
+        ans = st.text_area("あなたの回答を入力してください：", placeholder="例：〇〇という課題があったので、××という工夫をして解決しました。", height=120)
+        submit = st.form_submit_button(label="この回答で採点する！", type="primary")
+        
+    if submit:
+        if ans.strip() != "":
+            with st.spinner("採点中... 評価シートを作成しています..."):
+                score_prompt = (
+                    f"面接のテーマ: {st.session_state.diary_theme}\n"
+                    f"面接官の質問: {st.session_state.ai_question}\n"
+                    f"学生の回答: {ans}\n\n"
+                    "上記を踏まえ、学生の回答を厳しく、かつ具体的なアドバイスを交えて採点してください。\n"
+                    "スマホで見やすくなるよう、長文は避け、必ず以下のフォーマット（絵文字含む）通りに出力してください。\n\n"
+                    "💯 【得点】: 〇〇点 / 100点\n\n"
+                    "👍 【良かったところ】\n"
+                    "・（ここに箇条書きで1点）\n\n"
+                    "⚠️ 【悪かったところ・足りない視点】\n"
+                    "・（ここに箇条書きで1点）\n\n"
+                    "✨ 【こう直すともっと響く！修正案】\n"
+                    "「（ここに面接官を唸らせる具体的な模範解答の文章）」"
+                )
+                try:
+                    result_text = generate_with_retry(score_prompt)
+                    st.session_state.user_answer = ans
+                    st.session_state.score_result = result_text
+                    st.session_state.step = "show_result"
+                    st.rerun()
+                except:
+                    st.error("採点に失敗しました。もう一度送信してください。")
+
+# --- ステップ3: 採点結果の表示 ---
+elif st.session_state.step == "show_result":
+    st.success("🎉 採点完了！結果が出ました")
     
-    st.subheader("🗣 面接官との対話")
+    st.text_container = st.container(border=True)
+    with st.text_container:
+        st.markdown(f"**テーマ:** {st.session_state.diary_theme}")
+        st.markdown(f"**質問:** {st.session_state.ai_question}")
+        st.markdown(f"**あなたの回答:** {st.session_state.user_answer}")
     
-    # 過去の履歴を表示
-    for msg in st.session_state.chat_history[1:]:
-        if msg["role"] == "model":
-            st.markdown(f"🤖 **面接官:** {msg['text']}")
-        else:
-            st.markdown(f"👤 **あなた:** {msg['text']}")
+    st.write("---")
+    
+    # 採点結果をドカンと表示
+    st.markdown("### 📊 AI面接官のガチ評価シート")
+    st.info(st.session_state.score_result)
     
     st.write("")
     
-    with st.form(key="reply_form", clear_on_submit=True):
-        user_reply = st.text_area("面接官の質問に対するあなたの回答を入力：", height=100)
-        submit_button = st.form_submit_button(label="回答を送信する")
-
-    advice_button = st.button("💡 模範解答・アドバイスを貰う")
-    
-    # --- 送信ボタンが押された時の処理 ---
-    if submit_button:
-        if user_reply.strip() != "":
-            chat_context = ""
-            for m in st.session_state.chat_history:
-                speaker = "学生" if m["role"] == "user" else "面接官"
-                chat_context += f"{speaker}: {m['text']}\n"
-            chat_context += f"学生: {user_reply}\n"
-            
-            # 【プロンプト修正】ここでも余計な解説を徹底的に排除
-            prompt = (
-                f"これまでの面接のやり取りは以下の通りです：\n{chat_context}\n\n"
-                "これに対する次の深掘り質問を1つだけ作成してください。\n"
-                "【重要ルール】「回答ありがとうございます」や「〜という意図を込めています」などの前置き・解説は一切禁止します。"
-                "面接官の純粋な質問のセリフ（テキスト）だけを1文〜2文で出力してください。"
-            )
-            
-            success = False
-            with st.spinner("面接官が考えています..."):
-                try:
-                    ai_text = generate_with_retry(prompt)
-                    st.session_state.chat_history.append({"role": "user", "text": user_reply})
-                    st.session_state.chat_history.append({"role": "model", "text": ai_text})
-                    success = True
-                except:
-                    st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
-            
-            if success:
-                st.rerun()
-                
-    # --- アドバイスボタンが押された時の処理 ---
-    if advice_button:
-        chat_context = ""
-        for m in st.session_state.chat_history:
-            speaker = "学生" if m["role"] == "user" else "面接官"
-            chat_context += f"{speaker}: {m['text']}\n"
-            
-        # 【プロンプト修正】簡潔で見やすいアドバイスを要求
-        advice_prompt = (
-            f"これまでの面接のやり取りを元に、学生へのフィードバックを作成してください。\n\n"
-            f"【やり取り】\n{chat_context}\n\n"
-            "【出力ルール】\n"
-            "スマホで見やすくなるよう、長文は避け、以下の3つのセクションに分けて簡潔に箇条書きなどで出力してください。\n"
-            "1. 🎯 今回の回答の評価（良かった点・足りない視点を1文で）\n"
-            "2. 🌟 模範解答（面接官を「おっ」と言わせる文章の具体例）\n"
-            "3. 💡 ワンポイントアドバイス（次のステップへの改善点）"
-        )
-        
-        with st.spinner("アドバイザーが模範解答を執筆中..."):
-            try:
-                ai_text = generate_with_retry(advice_prompt)
-                st.markdown("### 🌟 AI面接官からの模範解答・アドバイス")
-                st.info(ai_text)
-            except:
-                st.error("Googleのサーバーが極度に混み合っています。少し時間を置いて再度お試しください。")
+    # もう一度遊ぶボタン（状態をリセット）
+    if st.button("🔄 もう一度別のテーマで練習する", type="secondary"):
+        st.session_state.step = "input_diary"
+        st.session_state.diary_theme = ""
+        st.session_state.ai_question = ""
+        st.session_state.user_answer = ""
+        st.session_state.score_result = ""
+        st.rerun()
