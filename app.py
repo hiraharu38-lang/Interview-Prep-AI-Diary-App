@@ -17,9 +17,8 @@ st.set_page_config(page_title="Slide Generator AI PRO", page_icon="🎨", layout
 SELECT_MODEL = "gemini-2.5-flash"
 api_key = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=api_key)
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IMAGE_DIR = os.path.join(_BASE_DIR, "images") + os.sep
-TEMPLATE_PATH = os.path.join(_BASE_DIR, "master_template.pptx")
+IMAGE_DIR = "./images/"
+TEMPLATE_PATH = "./master_template.pptx"
 
 # テンプレート内の「お手本スライド」のインデックス（0始まり）と役割の対応
 MODEL_INDEX = {
@@ -289,12 +288,10 @@ st.caption("テーマや資料を入れるだけで、プロ仕様のPowerPoint�
 with st.sidebar:
     st.header("設定")
     num_slides = st.slider("スライド枚数（表紙・まとめ含む）", min_value=5, max_value=14, value=8)
-    st.caption(f"テンプレートパス: `{TEMPLATE_PATH}`")
     if os.path.exists(TEMPLATE_PATH):
         st.success("✅ master_template.pptx 準備完了")
     else:
-        st.error("❌ master_template.pptx が見つかりません")
-        st.caption(f"カレントディレクトリ: `{os.getcwd()}`")
+        st.error("⚠️ master_template.pptx をapp.pyと同じフォルダに置いてください")
 
 uploaded_file = st.file_uploader("資料をアップロード（PDF / Word）任意", type=["pdf", "docx"])
 theme = st.text_area("テーマや発表したい内容を入力してください：", height=140,
@@ -360,8 +357,7 @@ if st.button("スライドを生成する", type="primary"):
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 )
             except Exception as e:
-                import traceback
-                st.error(f"エラー: {e}")
-                st.code(traceback.format_exc())
+                st.error("エラーが発生しました。もう一度お試しください。")
+                st.write(e)
     else:
         st.warning("テーマを入力するか、資料をアップロードしてください。")
